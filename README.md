@@ -24,6 +24,26 @@ abi-wizard <file/path>
 
 where file/path is a path to a location to scan.
 
+## Output
+
+Up to 4 files per device architecture may be generated:
+
+| File             | Purpose                                            |
+| ---------------- | -------------------------------------------------- |
+| abi_libs         | List of ELF files provided by the search path      |
+| abi_symbols      | List of symbols exported by the detected ELF files |
+| abi_used_libs    | List of libs imported by the detected ELF files    |
+| abi_used_symbols | List of symbols imported by the detected ELF files |
+
+A suffix will be added to the output files to signify the architecture:
+
+| Architecture | Suffix |
+| ------------ | ------ |
+| x86          | 32     |
+| x86_64       | N/A    |
+
+Currently only 32-bit and 64-bit x86 architectures are supported
+
 ## License
  
 Copyright 2019 Bryan T. Meyers <bmeyers@datadrake.com>
