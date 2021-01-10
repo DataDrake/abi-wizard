@@ -5,7 +5,7 @@ Tool for generating ABI reports for libraries and binaries
 
 ## Motivation
 
-As a package maintainer, it's a challenging task to keep track of binary dependencies and ABI changes. This tool generatres reports that can be used to inform maintainers of ABI and dependency changes.
+As a package maintainer, it's a challenging task to keep track of binary dependencies and ABI changes. This tool generates reports that can be used to inform maintainers of ABI and dependency changes.
 
 ## Goals
  * Fast scan times
