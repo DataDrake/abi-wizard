@@ -1,5 +1,5 @@
 //
-// Copyright 2019 Bryan T. Meyers <bmeyers@datadrake.com>
+// Copyright 2019-2021 Bryan T. Meyers <root@datadrake.com>
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -22,53 +22,98 @@ import (
 	"sort"
 )
 
-// libsFmt is the filename format for lib listings
-const libsFmt = "abi%s_libs%s"
-
-// synsFmt is the filename format for symbol listings
-const symsFmt = "abi%s_symbols%s"
+const (
+	// libsFmt is the filename format for lib listings
+	libsFmt = "abi%s_libs%s"
+	// synsFmt is the filename format for symbol listings
+	symsFmt = "abi%s_symbols%s"
+)
 
 // Links models the linkage between libraries and symbols
 type Links struct {
-	libs []string
-	syms Symbols
+	Libs map[string]int
+	Syms map[string]Symbols
+}
+
+// NewLinks creates a new Links and its maps
+func NewLinks() Links {
+	return Links{
+		Libs: make(map[string]int),
+		Syms: make(map[string]Symbols),
+	}
+}
+
+// Prune removes a set of related Links from another set of links
+func (l Links) Prune(excludes Links) {
+	for lib := range excludes.Libs {
+		delete(l.Libs, lib)
+		delete(l.Syms, lib)
+	}
+}
+
+// Resolve will fix up any links where the library is unknown
+func (l Links) Resolve(provided Links) {
+	missingSymbols := l.Syms["UNKNOWN"]
+	var unknown Symbols
+	for _, missing := range missingSymbols {
+		found := false
+		for lib, symbols := range provided.Syms {
+			for _, symbol := range symbols {
+				if symbol == missing {
+					l.Libs[lib]++
+					l.Syms[lib] = append(l.Syms[lib], missing)
+					found = true
+					break
+				}
+			}
+			if found {
+				break
+			}
+		}
+		if !found {
+			unknown = append(unknown, missing)
+		}
+	}
+	if len(unknown) == 0 {
+		delete(l.Libs, "UNKNOWN")
+		delete(l.Syms, "UNKNOWN")
+		return
+	}
+	l.Libs["UNKNOWN"] = len(unknown)
+	l.Syms["UNKNOWN"] = unknown
 }
 
 // Save writes a Links struct out to files as needed
-func (l Links) Save(suffix, prefix string) {
+func (l Links) Save(infix, suffix string) error {
 	// ignore if empty list
-	if len(l.libs) > 0 {
-		// create the output file
-		libs, err := os.Create(fmt.Sprintf(libsFmt, prefix, suffix))
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Failed to create lib listing, reason: '%s'\n", err.Error())
-			os.Exit(1)
-		}
-		// write out each library
-		for i, lib := range l.libs {
-			// skip duplicate libs
-			if i > 0 && l.libs[i] == l.libs[i-1] {
+	if len(l.Libs) == 0 {
+		return nil
+	}
+	libs, err := os.Create(fmt.Sprintf(libsFmt, infix, suffix))
+	if err != nil {
+		return fmt.Errorf("failed to create lib listing, reason: '%s'", err)
+	}
+	defer libs.Close()
+	syms, err := os.Create(fmt.Sprintf(symsFmt, infix, suffix))
+	if err != nil {
+		return fmt.Errorf("failed to create symbols listing, reason: '%s'", err)
+	}
+	defer syms.Close()
+	var keys []string
+	for key := range l.Libs {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, lib := range keys {
+		symbols := l.Syms[lib]
+		fmt.Fprintln(libs, lib)
+		sort.Sort(symbols)
+		for i, symbol := range symbols {
+			if i > 0 && symbols[i-1] == symbol {
 				continue
 			}
-			fmt.Fprintln(libs, lib)
+			fmt.Fprintf(syms, "%s:%s\n", lib, symbol)
 		}
-		libs.Close()
 	}
-	// ignore if empty list
-	if len(l.syms) > 0 {
-		// create the output file
-		syms, err := os.Create(fmt.Sprintf(symsFmt, prefix, suffix))
-		if err != nil {
-			panic(err.Error())
-		}
-		// write the symbols out
-		l.syms.Print(syms)
-		syms.Close()
-	}
-}
-
-// Sort reorders the lists inside the Links struct
-func (l Links) Sort() {
-	sort.Strings(l.libs)
-	sort.Sort(l.syms)
+	return nil
 }

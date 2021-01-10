@@ -1,5 +1,5 @@
 //
-// Copyright 2019 Bryan T. Meyers <bmeyers@datadrake.com>
+// Copyright 2019-2021 Bryan T. Meyers <root@datadrake.com>
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,19 +18,30 @@ package main
 
 // Arch bundles all of the symbols and libraries for a given architecture
 type Arch struct {
-	suffix   string
-	provides Links
-	uses     Links
+	Suffix   string
+	Provides Links
+	Uses     Links
+}
+
+// NewArch returns a new empty Architecture
+func NewArch(suffix string) Arch {
+	return Arch{
+		Suffix:   suffix,
+		Provides: NewLinks(),
+		Uses:     NewLinks(),
+	}
+}
+
+// Resolve unknown libraries
+func (a Arch) Resolve() {
+	a.Uses.Resolve(a.Provides)
 }
 
 // Save writes an architecture to disk
-func (a Arch) Save() {
-	a.provides.Save(a.suffix, "")
-	a.uses.Save(a.suffix, "_used")
-}
-
-// Sort reorders the entries inside the struct
-func (a Arch) Sort() {
-	a.provides.Sort()
-	a.uses.Sort()
+func (a Arch) Save() error {
+	a.Uses.Prune(a.Provides)
+	if err := a.Provides.Save("", a.Suffix); err != nil {
+		return err
+	}
+	return a.Uses.Save("_used", a.Suffix)
 }

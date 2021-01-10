@@ -23,17 +23,17 @@ GOLINT    = golint -set_exit_status
 
 all: build
 
-build: setup-deps
+build:
 	@$(call stage,BUILD)
 	@$(GOBUILD)
 	@$(call pass,BUILD)
 
-test: build
+test:
 	@$(call stage,TEST)
 	@$(GOTEST) ./...
 	@$(call pass,TEST)
 
-validate: setup-deps
+validate:
 	@$(call stage,FORMAT)
 	@$(GOFMT) ./...
 	@$(call pass,FORMAT)
@@ -45,13 +45,6 @@ validate: setup-deps
 	@$(call task,Running 'golint'...)
 	@$(GOLINT) `go list ./... | grep -v vendor`
 	@$(call pass,LINT)
-
-setup-deps:
-	@$(call stage,DEPS)
-	$(call task,Installing golint...)
-	$(GOBUILDDEP) golang.org/x/lint
-	$(GOCLEANDEP) ./...
-	@$(call pass,DEPS)
 
 install:
 	@$(call stage,INSTALL)
@@ -65,8 +58,6 @@ uninstall:
 
 clean:
 	@$(call stage,CLEAN)
-	@$(call task,Removing _build directory...)
-	@rm -rf _build
 	@$(call task,Removing executable...)
 	@rm $(PKGNAME)
 	@$(call pass,CLEAN)

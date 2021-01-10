@@ -1,5 +1,5 @@
 //
-// Copyright 2019 Bryan T. Meyers <bmeyers@datadrake.com>
+// Copyright 2019-2021 Bryan T. Meyers <root@datadrake.com>
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,6 +18,8 @@ package main
 
 import (
 	"debug/elf"
+	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -31,98 +33,133 @@ var machineNames = map[elf.Machine]string{
 }
 
 // Report contains one or more architecture descriptions
-type Report struct {
-	arches map[string]Arch
+type Report map[string]Arch
+
+// Resolve missing libraries
+func (r Report) Resolve() {
+	for _, arch := range r {
+		arch.Resolve()
+	}
 }
 
 // Save writes a report to disk
-func (r Report) Save() {
-	for _, arch := range r.arches {
-		arch.Save()
+func (r Report) Save() error {
+	for _, arch := range r {
+		if err := arch.Save(); err != nil {
+			return err
+		}
 	}
+	return nil
 }
 
 // AddDir reads the contents of a directory and adds information to the report
-func (r Report) AddDir(path string) {
+func (r Report) AddDir(path string) error {
 	infos, err := ioutil.ReadDir(path)
 	if err != nil {
-		return
+		return fmt.Errorf("failed to read directory '%s', reason: %s", path, err)
 	}
 	for _, info := range infos {
-		r.Add(filepath.Join(path, info.Name()))
+		if err = r.Add(filepath.Join(path, info.Name())); err != nil {
+			return err
+		}
 	}
+	return nil
 }
 
 // Add the specified path to the report
-func (r Report) Add(path string) {
-	// try to stat the path
+func (r Report) Add(path string) error {
 	info, err := os.Lstat(path)
 	if err != nil {
-		return
+		return fmt.Errorf("could not stat file '%s', reason: %s", path, err)
 	}
-	// use AddDir for direcctories
 	if info.IsDir() {
-		r.AddDir(path)
-		return
+		return r.AddDir(path)
+	}
+	if (info.Mode() & os.ModeSymlink) == os.ModeSymlink {
+		return nil
 	}
 	// check for executable bit to ignore other file types
-	mode := info.Mode()
-	if mode&0111 == 0 {
-		return
+	if mode := info.Mode(); mode&0111 == 0 {
+		return nil
 	}
 	// ignore statically linked archives or debug symbols
 	if strings.HasSuffix(info.Name(), ".la") || strings.HasSuffix(info.Name(), ".a") || strings.HasSuffix(info.Name(), ".debug") {
-		return
+		return nil
 	}
-	// Read the ELF
-	f, err := elf.Open(path)
+	f, err := os.Open(path)
 	if err != nil {
-		//fmt.Fprintf(os.Stderr, "failed to open '%s', reason: '%s'\n", path, err.Error())
-		//os.Exit(1)
-		return
+		return fmt.Errorf("failed to open file '%s', reason: %s", path, err)
+	}
+	defer f.Close()
+	return r.AddFile(f, info.Name())
+}
+
+// AddFile adds the specified file to the report
+func (r Report) AddFile(in io.ReaderAt, name string) error {
+	// Read the ELF
+	f, err := elf.NewFile(in)
+	if err != nil {
+		if strings.Contains(err.Error(), "bad magic number") {
+			return nil
+		}
+		return fmt.Errorf("failed to open '%s', reason: '%s'", name, err)
 	}
 	defer f.Close()
 	// get the architecture entry or create if missing
-	name := machineNames[f.Machine]
-	arch := r.arches[name]
-	if arch.suffix != name {
-		arch = Arch{
-			suffix: name,
-		}
+	archName := machineNames[f.Machine]
+	arch, ok := r[archName]
+	if !ok {
+		arch = NewArch(archName)
 	}
 	// process based on ELF type
 	switch f.Type {
 	case elf.ET_DYN:
 		// Shared Object / DLL Libraries
-		arch.provides.libs = append(arch.provides.libs, info.Name())
 		symbols, err := f.DynamicSymbols()
-		if err == nil {
-			syms := convertDynamic(info.Name(), symbols)
-			arch.provides.syms = append(arch.provides.syms, syms...)
+		if err != nil {
+			return err
 		}
-		// still need to process imports
+		dynName, err := f.DynString(elf.DT_SONAME)
+		if err != nil {
+			return err
+		}
+		if len(dynName) > 0 {
+			name = dynName[0]
+		}
+		for _, symbol := range symbols {
+			stBind := elf.ST_BIND(symbol.Info)
+			if (stBind & elf.STB_WEAK) == elf.STB_WEAK {
+				continue
+			}
+			if symbol.Section == elf.SHN_UNDEF {
+				continue
+			}
+			arch.Provides.Libs[name]++
+			arch.Provides.Syms[name] = append(arch.Provides.Syms[name], symbol.Name)
+		}
 		fallthrough
 	case elf.ET_EXEC, elf.ET_REL:
 		// Executables and relocatable binaries
 		libs, err := f.ImportedLibraries()
-		if err != nil {
-			break
+		for _, lib := range libs {
+			arch.Uses.Libs[lib]++
 		}
-		arch.uses.libs = append(arch.uses.libs, libs...)
 		symbols, err := f.ImportedSymbols()
-		if err == nil {
-			arch.uses.syms = append(arch.uses.syms, symbols...)
+		if err != nil {
+			return err
+		}
+		for _, symbol := range symbols {
+			name := symbol.Library
+			if len(name) == 0 {
+				name = "UNKNOWN"
+			}
+			arch.Uses.Libs[name]++
+			arch.Uses.Syms[name] = append(arch.Uses.Syms[name], symbol.Name)
 		}
 	default:
-		return
+		return nil
 	}
 	// save changes
-	r.arches[name] = arch
-}
-
-// Sort the architectures inside the Report
-func (r Report) Sort() {
-	for _, arch := range r.arches {
-		arch.Sort()
-	}
+	r[archName] = arch
+	return nil
 }

@@ -1,5 +1,5 @@
 //
-// Copyright 2019 Bryan T. Meyers <bmeyers@datadrake.com>
+// Copyright 2019-2021 Bryan T. Meyers <root@datadrake.com>
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -26,9 +26,12 @@ func main() {
 		fmt.Fprintln(os.Stderr, "usage: abi-wizard <file/folder>")
 		os.Exit(1)
 	}
-	r := Report{make(map[string]Arch)}
-	r.Add(os.Args[1])
-	r.Sort()
-	r.Save()
-	os.Exit(0)
+	r := make(Report)
+	if err := r.Add(os.Args[1]); err != nil {
+		fmt.Fprintln(os.Stderr, err.Error())
+	}
+	r.Resolve()
+	if err := r.Save(); err != nil {
+		fmt.Fprintln(os.Stderr, err.Error())
+	}
 }
