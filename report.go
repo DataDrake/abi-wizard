@@ -23,6 +23,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 )
 
@@ -32,14 +33,73 @@ var machineNames = map[elf.Machine]string{
 	elf.EM_X86_64: "",
 }
 
+// machineTypes maps machine type to a file suffix
+var machineTypes = map[string]elf.Machine{
+	"32": elf.EM_386,
+	"":   elf.EM_X86_64,
+}
+
+// machineLibs maps machine type to directories for its libs
+var machineLibs = map[elf.Machine][]string{
+	elf.EM_386: []string{
+		"/lib32",
+		"/usr/lib32",
+	},
+	elf.EM_X86_64: []string{
+		"/lib64",
+		"/usr/lib64",
+	},
+}
+
 // Report contains one or more architecture descriptions
 type Report map[string]Arch
 
 // Resolve missing libraries
-func (r Report) Resolve() {
+func (r Report) Resolve() error {
+	var missing []string
 	for _, arch := range r {
-		arch.Resolve()
+		missing = append(missing, arch.Resolve()...)
 	}
+	var unique []string
+	sort.Strings(missing)
+	for i, m := range missing {
+		if i != 0 && missing[i-1] == m {
+			continue
+		}
+		unique = append(unique, m)
+	}
+	missing = make([]string, 0)
+	if len(unique) > 0 {
+		r2 := make(Report)
+		for arch := range r {
+			archType := machineTypes[arch]
+			for _, dir := range machineLibs[archType] {
+				err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+					if info.IsDir() {
+						return nil
+					}
+					name := info.Name()
+					for _, u := range unique {
+						if name == u {
+							return r2.Add(path)
+						}
+					}
+					return nil
+				})
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "error: %s\n", err)
+				}
+			}
+		}
+		for name, arch := range r {
+			missing = append(missing, arch.ResolveMissing(r2[name])...)
+		}
+	}
+	sort.Strings(missing)
+	if len(missing) > 0 {
+		return fmt.Errorf("libraries not found %#v", missing)
+	}
+	return nil
 }
 
 // Save writes a report to disk
@@ -74,9 +134,6 @@ func (r Report) Add(path string) error {
 	}
 	if info.IsDir() {
 		return r.AddDir(path)
-	}
-	if (info.Mode() & os.ModeSymlink) == os.ModeSymlink {
-		return nil
 	}
 	// check for executable bit to ignore other file types
 	if mode := info.Mode(); mode&0111 == 0 {

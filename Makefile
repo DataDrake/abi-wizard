@@ -10,7 +10,7 @@ GOTAGS      = ""
 GOCC        = go
 GOFMT       = $(GOCC) fmt -x
 GOGET       = $(GOCC) get $(GOLDFLAGS)
-GOBUILD     = $(GOCC) build -v $(GOLDFLAGS) $(GOTAGS)
+GOBUILD     = CGO_ENABLED=0 $(GOCC) build -v $(GOLDFLAGS) $(GOTAGS)
 GOTEST      = $(GOCC) test
 GOVET       = $(GOCC) vet
 GOINSTALL   = $(GOCC) install $(GOLDFLAGS)

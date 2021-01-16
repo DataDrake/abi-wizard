@@ -52,7 +52,7 @@ func (l Links) Prune(excludes Links) {
 }
 
 // Resolve will fix up any links where the library is unknown
-func (l Links) Resolve(provided Links) {
+func (l Links) Resolve(provided Links) (missing []string) {
 	missingSymbols := l.Syms["UNKNOWN"]
 	var unknown Symbols
 	for _, missing := range missingSymbols {
@@ -81,6 +81,12 @@ func (l Links) Resolve(provided Links) {
 	}
 	l.Libs["UNKNOWN"] = len(unknown)
 	l.Syms["UNKNOWN"] = unknown
+	for name := range l.Libs {
+		if _, ok := l.Syms[name]; !ok {
+			missing = append(missing, name)
+		}
+	}
+	return
 }
 
 // Save writes a Links struct out to files as needed

@@ -33,8 +33,13 @@ func NewArch(suffix string) Arch {
 }
 
 // Resolve unknown libraries
-func (a Arch) Resolve() {
-	a.Uses.Resolve(a.Provides)
+func (a *Arch) Resolve() []string {
+	return a.Uses.Resolve(a.Provides)
+}
+
+// ResolveMissing unknown libraries from a search of the missing libraries
+func (a *Arch) ResolveMissing(a2 Arch) []string {
+	return a.Uses.Resolve(a2.Provides)
 }
 
 // Save writes an architecture to disk

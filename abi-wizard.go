@@ -29,9 +29,13 @@ func main() {
 	r := make(Report)
 	if err := r.Add(os.Args[1]); err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())
+		os.Exit(1)
 	}
-	r.Resolve()
+	if err := r.Resolve(); err != nil {
+		fmt.Fprintf(os.Stderr, err.Error())
+	}
 	if err := r.Save(); err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())
+		os.Exit(1)
 	}
 }
