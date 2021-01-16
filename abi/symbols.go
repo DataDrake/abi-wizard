@@ -14,7 +14,7 @@
 // limitations under the License.
 //
 
-package main
+package abi
 
 // Symbols are lists of Symbols
 type Symbols []string

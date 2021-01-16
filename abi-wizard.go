@@ -18,6 +18,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/DataDrake/abi-wizard/abi"
 	"os"
 )
 
@@ -26,7 +27,7 @@ func main() {
 		fmt.Fprintln(os.Stderr, "usage: abi-wizard <file/folder>")
 		os.Exit(1)
 	}
-	r := make(Report)
+	r := make(abi.Report)
 	if err := r.Add(os.Args[1]); err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())
 		os.Exit(1)

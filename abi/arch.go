@@ -14,7 +14,7 @@
 // limitations under the License.
 //
 
-package main
+package abi
 
 // Arch bundles all of the symbols and libraries for a given architecture
 type Arch struct {
