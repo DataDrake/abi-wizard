@@ -20,7 +20,6 @@ import (
 	"debug/elf"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"sort"
@@ -112,43 +111,27 @@ func (r Report) Save() error {
 	return nil
 }
 
-// AddDir reads the contents of a directory and adds information to the report
-func (r Report) AddDir(path string) error {
-	infos, err := ioutil.ReadDir(path)
-	if err != nil {
-		return fmt.Errorf("failed to read directory '%s', reason: %s", path, err)
-	}
-	for _, info := range infos {
-		if err = r.Add(filepath.Join(path, info.Name())); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 // Add the specified path to the report
 func (r Report) Add(path string) error {
-	info, err := os.Lstat(path)
-	if err != nil {
-		return fmt.Errorf("could not stat file '%s', reason: %s", path, err)
-	}
-	if info.IsDir() {
-		return r.AddDir(path)
-	}
-	// check for executable bit to ignore other file types
-	if mode := info.Mode(); mode&0111 == 0 {
-		return nil
-	}
-	// ignore statically linked archives or debug symbols
-	if strings.HasSuffix(info.Name(), ".la") || strings.HasSuffix(info.Name(), ".a") || strings.HasSuffix(info.Name(), ".debug") {
-		return nil
-	}
-	f, err := os.Open(path)
-	if err != nil {
-		return fmt.Errorf("failed to open file '%s', reason: %s", path, err)
-	}
-	defer f.Close()
-	return r.AddFile(f, info.Name())
+	return filepath.Walk(path, func(path string, info os.FileInfo, err error) error {
+		if info.IsDir() {
+			return nil
+		}
+		// check for executable bit to ignore other file types
+		if info.Mode()&0111 == 0 {
+			return nil
+		}
+		// ignore statically linked archives or debug symbols
+		if strings.HasSuffix(info.Name(), ".la") || strings.HasSuffix(info.Name(), ".a") || strings.HasSuffix(info.Name(), ".debug") {
+			return nil
+		}
+		f, err := os.Open(path)
+		if err != nil {
+			return fmt.Errorf("failed to open file '%s', reason: %s", path, err)
+		}
+		defer f.Close()
+		return r.AddFile(f, info.Name())
+	})
 }
 
 // AddFile adds the specified file to the report

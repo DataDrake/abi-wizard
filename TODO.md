@@ -1,6 +1,6 @@
 # TODO
 
-- [ ] Switch to using `filepath.Walk` for path-based scanning
+- [x] Switch to using `filepath.Walk` for path-based scanning
 - [x] Try resolving UNKNOWN symbols by examining Imported Libraries
     - [x] Read in exported symbols for each library into a Links structure
     - [x] Try resolving against each new Links structure
