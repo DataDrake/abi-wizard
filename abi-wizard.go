@@ -32,10 +32,14 @@ func main() {
 		fmt.Fprintln(os.Stderr, err.Error())
 		os.Exit(1)
 	}
-	if err := r.Resolve(); err != nil {
+	missing, err := r.Resolve()
+	if err != nil {
 		fmt.Fprintf(os.Stderr, err.Error())
 	}
-	if err := r.Save(); err != nil {
+	for _, lib := range missing {
+		fmt.Fprintf(os.Stderr, "Missing library: %s\n", lib)
+	}
+	if err = r.Save(); err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())
 		os.Exit(1)
 	}

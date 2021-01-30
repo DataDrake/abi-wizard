@@ -54,8 +54,7 @@ var machineLibs = map[elf.Machine][]string{
 type Report map[string]Arch
 
 // Resolve missing libraries
-func (r Report) Resolve() error {
-	var missing []string
+func (r Report) Resolve() (missing []string, err error) {
 	for _, arch := range r {
 		missing = append(missing, arch.Resolve()...)
 	}
@@ -95,10 +94,7 @@ func (r Report) Resolve() error {
 		}
 	}
 	sort.Strings(missing)
-	if len(missing) > 0 {
-		return fmt.Errorf("libraries not found %#v", missing)
-	}
-	return nil
+	return
 }
 
 // Save writes a report to disk
