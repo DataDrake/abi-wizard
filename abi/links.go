@@ -82,7 +82,7 @@ func (l Links) Resolve(provided Links) (missing []string) {
 	l.Libs["UNKNOWN"] = len(unknown)
 	l.Syms["UNKNOWN"] = unknown
 	for name := range l.Libs {
-		if _, ok := l.Syms[name]; !ok {
+		if _, ok := provided.Syms[name]; !ok {
 			missing = append(missing, name)
 		}
 	}
