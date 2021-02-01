@@ -45,7 +45,9 @@ var machineLibs = map[elf.Machine][]string{
 		"/usr/lib32",
 	},
 	elf.EM_X86_64: []string{
+		"/lib",
 		"/lib64",
+		"/usr/lib",
 		"/usr/lib64",
 	},
 }
@@ -93,7 +95,12 @@ func (r Report) Resolve() (missing []string, err error) {
 			}
 		}
 		for name, arch := range r {
-			missing = append(missing, arch.ResolveMissing(r2[name])...)
+			unresolved := arch.ResolveMissing(r2[name])
+			for _, lib := range unresolved {
+				if _, ok := arch.Uses.Syms[lib]; !ok {
+					missing = append(missing, lib)
+				}
+			}
 		}
 	}
 	sort.Strings(missing)
