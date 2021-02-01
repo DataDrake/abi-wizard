@@ -73,6 +73,9 @@ func (r Report) Resolve() (missing []string, err error) {
 			archType := machineTypes[arch]
 			for _, dir := range machineLibs[archType] {
 				err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+					if err != nil {
+						return err
+					}
 					if info.IsDir() {
 						return nil
 					}
