@@ -110,6 +110,9 @@ func (r Report) Save() error {
 // Add the specified path to the report
 func (r Report) Add(path string) error {
 	return filepath.Walk(path, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
 		if info.IsDir() {
 			return nil
 		}
