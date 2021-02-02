@@ -20,6 +20,7 @@ import (
 	"debug/elf"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"sort"
@@ -84,7 +85,7 @@ func (r Report) Resolve() (missing []string, err error) {
 					name := info.Name()
 					for _, u := range unique {
 						if name == u {
-							return r2.Add(path)
+							return r2.Add("", path)
 						}
 					}
 					return nil
@@ -118,29 +119,79 @@ func (r Report) Save() error {
 }
 
 // Add the specified path to the report
-func (r Report) Add(path string) error {
-	return filepath.Walk(path, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
+func (r Report) Add(root, path string) error {
+	info, err := os.Lstat(path)
+	if err != nil {
+		return err
+	}
+	return r.walkPivot(root, path, info)
+}
+
+func (r Report) walkDir(root, path string) error {
+	infos, err := ioutil.ReadDir(path)
+	if err != nil {
+		return err
+	}
+	for _, info := range infos {
+		loc := filepath.Join(path, info.Name())
+		if err = r.walkPivot(root, loc, info); err != nil {
 			return err
 		}
-		if info.IsDir() {
-			return nil
-		}
-		// check for executable bit to ignore other file types
-		if info.Mode()&0111 == 0 {
-			return nil
-		}
-		// ignore statically linked archives or debug symbols
-		if strings.HasSuffix(info.Name(), ".la") || strings.HasSuffix(info.Name(), ".a") || strings.HasSuffix(info.Name(), ".debug") {
-			return nil
-		}
+	}
+	return nil
+}
+
+func (r Report) walkPivot(root, path string, info os.FileInfo) error {
+	switch {
+	case info.Mode()&os.ModeSymlink != 0:
+		return r.walkSym(root, path)
+	case info.IsDir():
+		return r.walkDir(root, path)
+	default:
+		return r.walkFile(root, path, info)
+	}
+}
+
+func (r Report) walkSym(root, path string) error {
+	link, err := os.Readlink(path)
+	if err != nil {
+		return err
+	}
+	if strings.HasPrefix(link, "../") || !strings.HasPrefix(link, "/") {
+		// relative path
+		link = filepath.Join(filepath.Dir(path), link)
+	} else if filepath.IsAbs(link) && strings.HasPrefix(path, root) {
+		// abs path in root
+		link = filepath.Join(root, link)
+	} // implicit else: abs path outside root
+	info, err := os.Lstat(link)
+	if err != nil {
+		return err
+	}
+	return r.walkPivot(root, link, info)
+}
+
+func (r Report) walkFile(root, path string, info os.FileInfo) error {
+	// ignore statically linked archives or debug symbols
+	switch {
+	case strings.HasSuffix(info.Name(), ".o"):
+		return nil // object file
+	case strings.HasSuffix(info.Name(), ".la"):
+		return nil // libtools file
+	case strings.HasSuffix(info.Name(), ".a"):
+		return nil // static lib
+	case strings.HasSuffix(info.Name(), ".debug"):
+		return nil // debug info
+	case strings.HasSuffix(info.Name(), ".debuginfo"):
+		return nil // debug info
+	default:
 		f, err := os.Open(path)
 		if err != nil {
 			return fmt.Errorf("failed to open file '%s', reason: %s", path, err)
 		}
 		defer f.Close()
 		return r.AddFile(f, info.Name())
-	})
+	}
 }
 
 // AddFile adds the specified file to the report
@@ -149,6 +200,9 @@ func (r Report) AddFile(in io.ReaderAt, name string) error {
 	f, err := elf.NewFile(in)
 	if err != nil {
 		if strings.Contains(err.Error(), "bad magic number") {
+			return nil
+		}
+		if err == io.EOF {
 			return nil
 		}
 		return fmt.Errorf("failed to open '%s', reason: '%s'", name, err)

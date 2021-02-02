@@ -28,7 +28,7 @@ func main() {
 		os.Exit(1)
 	}
 	r := make(abi.Report)
-	if err := r.Add(os.Args[1]); err != nil {
+	if err := r.Add(os.Args[1], os.Args[1]); err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())
 		os.Exit(1)
 	}
