@@ -43,10 +43,10 @@ func (a *Arch) ResolveMissing(a2 Arch) []string {
 }
 
 // Save writes an architecture to disk
-func (a Arch) Save() error {
+func (a Arch) Save(path string) error {
 	a.Uses.Prune(a.Provides)
-	if err := a.Provides.Save("", a.Suffix); err != nil {
+	if err := a.Provides.Save(path, "", a.Suffix); err != nil {
 		return err
 	}
-	return a.Uses.Save("_used", a.Suffix)
+	return a.Uses.Save(path, "_used", a.Suffix)
 }

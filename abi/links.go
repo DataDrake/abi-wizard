@@ -19,6 +19,7 @@ package abi
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"sort"
 )
 
@@ -90,17 +91,19 @@ func (l Links) Resolve(provided Links) (missing []string) {
 }
 
 // Save writes a Links struct out to files as needed
-func (l Links) Save(infix, suffix string) error {
+func (l Links) Save(path, infix, suffix string) error {
 	// ignore if empty list
 	if len(l.Libs) == 0 {
 		return nil
 	}
-	libs, err := os.Create(fmt.Sprintf(libsFmt, infix, suffix))
+	libPath := fmt.Sprintf(libsFmt, infix, suffix)
+	libs, err := os.Create(filepath.Join(path, libPath))
 	if err != nil {
 		return fmt.Errorf("failed to create lib listing, reason: '%s'", err)
 	}
 	defer libs.Close()
-	syms, err := os.Create(fmt.Sprintf(symsFmt, infix, suffix))
+	symPath := fmt.Sprintf(symsFmt, infix, suffix)
+	syms, err := os.Create(filepath.Join(path, symPath))
 	if err != nil {
 		return fmt.Errorf("failed to create symbols listing, reason: '%s'", err)
 	}

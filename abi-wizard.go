@@ -39,7 +39,7 @@ func main() {
 	for _, lib := range missing {
 		fmt.Fprintf(os.Stderr, "Missing library: %s\n", lib)
 	}
-	if err = r.Save(); err != nil {
+	if err = r.Save("."); err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())
 		os.Exit(1)
 	}

@@ -109,9 +109,9 @@ func (r Report) Resolve() (missing []string, err error) {
 }
 
 // Save writes a report to disk
-func (r Report) Save() error {
+func (r Report) Save(path string) error {
 	for _, arch := range r {
-		if err := arch.Save(); err != nil {
+		if err := arch.Save(path); err != nil {
 			return err
 		}
 	}
