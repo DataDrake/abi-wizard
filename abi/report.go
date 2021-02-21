@@ -244,11 +244,20 @@ func (r Report) AddFile(in io.ReaderAt, name string) error {
 	case elf.ET_EXEC, elf.ET_REL:
 		// Executables and relocatable binaries
 		libs, err := f.ImportedLibraries()
+		if err != nil {
+			if err == elf.ErrNoSymbols {
+				return nil
+			}
+			return err
+		}
 		for _, lib := range libs {
 			arch.Uses.Libs[lib]++
 		}
 		symbols, err := f.ImportedSymbols()
 		if err != nil {
+			if err == elf.ErrNoSymbols {
+				return nil
+			}
 			return err
 		}
 		for _, symbol := range symbols {
